@@ -34,11 +34,8 @@ public class RankingEngine {
 			if (command.hasOption(TOPICS)) {
 				System.out.println(command.getOptionValue(TOPICS));
 			} else {
-				throw new MissingOptionException(
-						"Topic list was not specified. Please use the -"
-								+ TOPICS + " option");
+				throw new MissingOptionException("Topic list was not specified. Please use the -" + TOPICS + " option");
 			}
-
 		} catch (ParseException e) {
 			e.printStackTrace();
 		}
