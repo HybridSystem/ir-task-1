@@ -1,6 +1,8 @@
 package com.tuwien.isis.irtask1;
 
 import com.tuwien.isis.irtask1.indexer.Indexer;
+import com.tuwien.isis.irtask1.search.SearchEngine;
+
 import java.io.IOException;
 
 import org.apache.commons.cli.CommandLine;
@@ -50,6 +52,11 @@ public class RankingEngine {
 	 * Path to the document collection
 	 */
 	private static final String COLLECTION_PATH = "collection";
+	
+	/**
+	 * CLI option for running the search engine
+	 */
+	private static final String SEARCH = "s";
 
 	/**
 	 * Handle user arguments
@@ -68,6 +75,9 @@ public class RankingEngine {
 		Option max = new Option(MAX_FREQ, true, "maximum term frequency allowed to be included in index");
 		options.addOption(min);
 		options.addOption(max);
+		
+		options.addOption(SEARCH, false, "run search engine");
+		
 		CommandLineParser parser = new PosixParser();
 
 		try {
@@ -85,9 +95,17 @@ public class RankingEngine {
 				Indexer indexer = new Indexer(useStemming, removeStopwords, minFreq, maxFreq);
 				indexer.createIndex(COLLECTION_PATH);
 				indexer.storeIndex();
-			} else if (false) {
-				// TODO
-				// String topicList = getTopicList(command);
+			} else if (command.hasOption(SEARCH)) {
+				
+				//hardcoding everything for fun and debug
+				
+				SearchEngine search = new SearchEngine(10);
+				
+				String inputFilePath = "input_topics.txt";
+				String indexFilePath = "index.arff";
+				search.searchSimilarDocuments(inputFilePath, indexFilePath);
+				
+				System.out.println("search done");
 			} else {
 				System.out.println("no option selected");
 			}

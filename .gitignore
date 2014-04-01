@@ -3,3 +3,4 @@
 .settings/
 target/
 index.arff
+/output/
