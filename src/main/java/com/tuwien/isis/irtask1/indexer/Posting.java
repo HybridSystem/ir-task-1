@@ -7,14 +7,8 @@ package com.tuwien.isis.irtask1.indexer;
  */
 public class Posting {
 
-	/**
-	 * Posting id
-	 */
 	private int id;
 
-	/**
-	 * Posting position
-	 */
 	private int position;
 
 	public Posting(int id, int position) {
