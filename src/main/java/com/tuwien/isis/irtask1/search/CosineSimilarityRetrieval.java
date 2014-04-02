@@ -16,23 +16,23 @@ import java.util.Map.Entry;
 public class CosineSimilarityRetrieval {
 
 	/**
-	 * @param currQueryDocVec
+	 * @param queryDocVec
 	 * @return list with all documents with calculated cosines > 0
 	 */
 	public static List<DocumentVector> buildSearchResultsList(
-			DocumentVector currQueryDocVec, List<DocumentVector> documentVectors) {
+			DocumentVector queryDocVec, List<DocumentVector> documentVectors) {
 		List<DocumentVector> resultList = new ArrayList<DocumentVector>();
-		for (int i = 0; i < documentVectors.size(); i++) {
-
-			double cosine = calculateCosine(currQueryDocVec,
-					documentVectors.get(i));
-
+		
+		for (DocumentVector currDocVec: documentVectors){
+			
+			double cosine = calculateCosine(queryDocVec,
+					currDocVec);
+			
 			if (cosine != 0
-					&& (documentVectors.get(i).getDocumentData().getId() != currQueryDocVec
+					&& (currDocVec.getDocumentData().getId() != queryDocVec
 							.getDocumentData().getId())) {
-				DocumentVector curr = documentVectors.get(i);
-				curr.setCosine(cosine);
-				resultList.add(curr);
+				currDocVec.setCosine(cosine);
+				resultList.add(currDocVec);
 			}
 		}
 		return resultList;

@@ -97,22 +97,17 @@ public class SearchEngine {
 	 * @return
 	 */
 	private DocumentVector findQueryInDocumentList(String line) {
-		DocumentVector currDocVec = null;
-
-		// search document in document list
-		for (int i = 0; i < documentVectors.size(); i++) {
-			// String name = documentVectors.get(i).
-			// System.out.println(documentVectors.get(i).getFullDocName());
-			if (line.equals(documentVectors.get(i).getFullDocName())) {
-				currDocVec = documentVectors.get(i);
+		// search document in document list	
+		for(DocumentVector currDocVec: documentVectors){
+			
+			if(line.equals(currDocVec.getFullDocName())){
+				return currDocVec;
 			}
 		}
-
-		if (currDocVec == null) {
-			System.out.println("Document " + line + " not in collection");
-
-		}
-		return currDocVec;
+		
+		//in case nothing found return null
+		return null;
+		
 	}
 
 	private void writeSearchResultsIntoFile(String outputFilePath,
@@ -127,7 +122,7 @@ public class SearchEngine {
 
 			for (int k = 0; k < this.numberOfSearchResults; k++) {
 				DocumentVector currVec = resultList.get(k);
-				// TODO
+				// TODO add run_name - depending on search parameters/index
 				// topic1 Q0 misc.forsale/74721 1 34.32 group10_medium
 				String line = "topic" + topicNr + " Q0 "
 						+ currVec.getFullDocName()
