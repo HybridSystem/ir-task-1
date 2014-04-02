@@ -3,18 +3,16 @@ package com.tuwien.isis.irtask1;
 import com.tuwien.isis.irtask1.indexer.Indexer;
 import com.tuwien.isis.irtask1.search.SearchEngine;
 
-import java.io.IOException;
-
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.MissingOptionException;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
-import org.apache.commons.cli.ParseException;
 import org.apache.commons.cli.PosixParser;
 
 /**
- * TODO
+ * Main class of the ranking engine, which indexes a document collection or performs searches on it using a
+ * previously-generated index.
  */
 public class RankingEngine {
 
@@ -49,10 +47,15 @@ public class RankingEngine {
 	private static final String MAX_FREQ = "max";
 
 	/**
+	 * Path to the document index
+	 */
+	private static final String INDEX_PATH = "index.arff";
+
+	/**
 	 * Path to the document collection
 	 */
 	private static final String COLLECTION_PATH = "collection";
-	
+
 	/**
 	 * CLI option for running the search engine
 	 */
@@ -68,19 +71,20 @@ public class RankingEngine {
 		// Create user options and command line parser
 		Options options = new Options();
 		options.addOption(INDEXER, false, "run indexer");
+		options.addOption(SEARCH, false, "run search engine");
 		options.addOption(STEMMING, false, "use stemming during the creation of the index");
 		options.addOption(STOPWORDS, false, "remove stopwords during the creation of the index");
-		options.addOption(TOPICS, false, "list of input topics");
+		Option topics = new Option(TOPICS, true, "list of input topics");
 		Option min = new Option(MIN_FREQ, true, "minimum term frequency required to be added to index");
 		Option max = new Option(MAX_FREQ, true, "maximum term frequency allowed to be included in index");
+		options.addOption(topics);
 		options.addOption(min);
 		options.addOption(max);
-		
-		options.addOption(SEARCH, false, "run search engine");
-		
 		CommandLineParser parser = new PosixParser();
 
 		try {
+
+			// Parse user arguments
 			CommandLine command = parser.parse(options, args);
 
 			if (command.hasOption(INDEXER)) {
@@ -94,33 +98,21 @@ public class RankingEngine {
 				// Create and run indexer
 				Indexer indexer = new Indexer(useStemming, removeStopwords, minFreq, maxFreq);
 				indexer.createIndex(COLLECTION_PATH);
-				indexer.storeIndex();
+				indexer.storeIndex(INDEX_PATH);
 			} else if (command.hasOption(SEARCH)) {
-				
-				//hardcoding everything for fun and debug
-				
 				SearchEngine search = new SearchEngine(10);
-				
-				String inputFilePath = "input_topics.txt";
-				String indexFilePath = "index.arff";
-				search.searchSimilarDocuments(inputFilePath, indexFilePath);
-				
-				System.out.println("search done");
+				search.searchSimilarDocuments(getTopicList(command), INDEX_PATH);
+				System.out.println("Search completed.");
 			} else {
-				System.out.println("no option selected");
+				System.out.println("Invalid usage.");
 			}
-
-		} catch (ParseException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
 
 	/**
-	 * TODO
+	 * Retrieve the value of the topics option or throw an exception if it was not entered
 	 * 
 	 * @param command
 	 * @return

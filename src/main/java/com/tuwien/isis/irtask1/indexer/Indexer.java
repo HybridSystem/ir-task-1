@@ -6,18 +6,25 @@ import java.io.IOException;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
 import org.tartarus.martin.Stemmer;
 
+import weka.core.Attribute;
+import weka.core.FastVector;
+import weka.core.Instance;
+import weka.core.Instances;
 import weka.core.Stopwords;
+import weka.core.converters.ArffSaver;
+import weka.core.converters.Saver;
 
 /**
  * Create an index on the document collection
@@ -46,7 +53,14 @@ public class Indexer {
 	 */
 	private boolean removeStopwords;
 
+	/**
+	 * The minimum number of occurrences a word must have in the collection to be indexed
+	 */
 	private int minFreqThreshold;
+
+	/**
+	 * The maximum number of occurrences a word may have in the collection to be indexed
+	 */
 	private int maxFreqThreshold;
 
 	/**
@@ -54,23 +68,49 @@ public class Indexer {
 	 */
 	private boolean indexGenerated = false;
 
+	/**
+	 * Set of all class assignments
+	 */
 	private Set<String> classAssignmentSet = new HashSet<String>();
-	private Set<String> tokenSet = new HashSet<String>();
-	private ArrayList<String> sortedTokenList = new ArrayList<String>();
 
-	private ArrayList<Document> documentsList = new ArrayList<Document>();
+	/**
+	 * Set of all tokens
+	 */
+	private Set<String> tokenSet = new HashSet<String>();
+
+	/**
+	 * List of documents in the collections
+	 */
+	private List<Document> documentList = new ArrayList<Document>();
 
 	/**
 	 * Data structure to record in which documents terms occur
 	 */
 	private Map<String, ArrayList<Posting>> dictionary = new HashMap<String, ArrayList<Posting>>();
 
+	/**
+	 * Map of a token's frequency in documents
+	 */
 	private Map<String, Set<Integer>> tokenDocumentFrequency = new HashMap<String, Set<Integer>>();
-	private Map<String, Map<Integer, Float>> tokenIdfTfMap = new HashMap<String, Map<Integer, Float>>();
 
+	/**
+	 * Map of the IDFTF score of a token
+	 */
+	private Map<String, Map<Integer, Float>> tokenIdftfMap = new HashMap<String, Map<Integer, Float>>();
+
+	/**
+	 * Internal counter used to mark the document currently being processed
+	 */
 	private int currentDocumentId = 0;
+
+	/**
+	 * Internal counter used to mark the document class currently being processed
+	 */
 	private String currentDocClassName;
 
+	/**
+	 * Stemming object to transform words into their root form
+	 */
 	private Stemmer stemmer = new Stemmer();
 
 	/**
@@ -97,9 +137,8 @@ public class Indexer {
 	public void createIndex(String path) throws IOException {
 		if (!indexGenerated) {
 			readDocumentCollection(path);
-			removeTokensDependantOnThreshold();
+			applyTokenThresholds();
 			calculateTfidf();
-			createSortedTokenList();
 			indexGenerated = true;
 		} else {
 			System.err.println("Index has already been generated.");
@@ -109,12 +148,13 @@ public class Indexer {
 	/**
 	 * Store the index to disk (if it has been generated)
 	 * 
+	 * @param path
 	 * @throws Exception
 	 */
-	public void storeIndex() throws Exception {
+	public void storeIndex(String path) throws IOException {
 		if (indexGenerated) {
-			System.out.println("Starting to write index to file");
-			ARFFWriter.writeIndexToFile(this);
+			System.out.println("Writing index file to disk...");
+			writeIndexToFile(path);
 			System.out.println("Indexing and writing finished.");
 		} else {
 			System.err.println("Index has not yet been generated.");
@@ -165,7 +205,7 @@ public class Indexer {
 		String fileName = file.getName();
 
 		Document data = new Document(fileName, currentDocumentId, currentDocClassName);
-		documentsList.add(data);
+		documentList.add(data);
 		classAssignmentSet.add(currentDocClassName);
 
 		// Split the document string on all non-word characters
@@ -202,6 +242,8 @@ public class Indexer {
 	 * @param token
 	 */
 	private void processToken(String token) {
+
+		// Check if the token is made up of word characters and meets minimum length requirements
 		if (token.matches("[a-zA-Z]+") && token.length() >= MIN_TERM_LENGTH) {
 
 			// Check for stopwords (if enabled)
@@ -263,120 +305,184 @@ public class Indexer {
 	}
 
 	/**
+	 * Remove tokens if their frequency does not fall within the user-defined range
+	 */
+	private void applyTokenThresholds() {
+
+		// Set of tokens to be removed
+		Set<String> toRemove = new HashSet<String>();
+
+		// Check all tokens
+		for (Entry<String, Set<Integer>> entry : tokenDocumentFrequency.entrySet()) {
+			String token = entry.getKey();
+			Set<Integer> currentSet = entry.getValue();
+			int frequencyCount = currentSet.size();
+
+			if (frequencyCount > maxFreqThreshold || frequencyCount < minFreqThreshold) {
+				tokenSet.remove(token);
+				dictionary.remove(token);
+				tokenIdftfMap.remove(token);
+				toRemove.add(token);
+			}
+		}
+
+		// Remove tokens whose frequency was outside of the defined threshold
+		tokenDocumentFrequency.keySet().removeAll(toRemove);
+	}
+
+	/**
 	 * Calculate the term frequency–inverse document frequency for all tokens
 	 */
 	private void calculateTfidf() {
-		int docCount = documentsList.size();
 		for (Entry<String, Set<Integer>> entry : tokenDocumentFrequency.entrySet()) {
 			String token = entry.getKey();
 			int documentFrequency = entry.getValue().size();
 			ArrayList<Posting> postings = dictionary.get(token);
-			calculateIDFTFForToken(docCount, token, postings, documentFrequency);
+			calculateTfidfForToken(token, postings, documentFrequency);
 		}
 	}
 
 	/**
-	 * TODO
+	 * Calculate the term frequency–inverse document frequency for a given token
 	 * 
-	 * @param docCount
-	 * @param currentToken
+	 * @param token
 	 * @param postings
 	 * @param documentFrequency
 	 */
-	private void calculateIDFTFForToken(int docCount, String currentToken, ArrayList<Posting> postings,
-			int documentFrequency) {
-		Map<Integer, Float> currentDocIDFTFMap = null;
-		int j = 0;
+	private void calculateTfidfForToken(String token, ArrayList<Posting> postings, int documentFrequency) {
 
-		// For every document in our list
-		int documentsCount = documentsList.size();
-		for (int i = 0; i < documentsCount; ++i) {
-			int currentDocumentId = documentsList.get(i).getId();
+		Map<Integer, Float> currentDocIdftfMap = null;
 
-			int postingsCount = postings.size();
-
-			// Get token occurrences in current document
-			int tokenOccurancesInDocument = 0;
-			for (; j < postingsCount; ++j) {
-				int curDocID = postings.get(j).getId();
-				if (curDocID > currentDocumentId) {
+		for (Document document : documentList) {
+			int documentId = document.getId();
+			int occurancesInDocument = 0;
+			for (Posting posting : postings) {
+				int curDocID = posting.getId();
+				if (curDocID > documentId) {
 					break;
-				} else if (curDocID == currentDocumentId) {
-					++tokenOccurancesInDocument;
+				} else if (curDocID == documentId) {
+					occurancesInDocument++;
 				}
 			}
 
-			float idfValue = (float) Math.log10(docCount / (float) documentFrequency);
+			// Calculate term frequency–inverse document frequency
+			float idfValue = (float) Math.log10(documentList.size() / (float) documentFrequency);
+			float tfValue = (occurancesInDocument != 0) ? (float) (1.0 + Math.log10(occurancesInDocument)) : 0;
+			float tfidfValue = idfValue * tfValue;
 
-			float tfValue = 0;
-			if (tokenOccurancesInDocument != 0)
-				tfValue = (float) (1.0 + Math.log10(tokenOccurancesInDocument));
+			if (tfidfValue > 0) {
 
-			float tfIdfValue = idfValue * tfValue;
+				// Round the value to a reasonable amount of precision
+				DecimalFormat formatter = new DecimalFormat("#.###");
+				tfidfValue = Float.parseFloat(formatter.format(tfidfValue));
 
-			if (tfIdfValue > 0) {
-				// If needed make new map
-				if (currentDocIDFTFMap == null) {
-					currentDocIDFTFMap = new HashMap<Integer, Float>();
-					tokenIdfTfMap.put(currentToken, currentDocIDFTFMap);
+				// Check if map needs to be created
+				if (currentDocIdftfMap == null) {
+					currentDocIdftfMap = new HashMap<Integer, Float>();
+					tokenIdftfMap.put(token, currentDocIdftfMap);
 				}
 
-				currentDocIDFTFMap.put(currentDocumentId, tfIdfValue);
+				currentDocIdftfMap.put(documentId, tfidfValue);
 			}
 		}
 	}
 
 	/**
-	 * TODO
+	 * Write the generated index file to disk
+	 * 
+	 * @param path
+	 * @throws IOException
 	 */
-	private void removeTokensDependantOnThreshold() {
-		Iterator<Entry<String, Set<Integer>>> tokenDocFreqIter = tokenDocumentFrequency.entrySet().iterator();
-		// For every token (get the counted document frequency of each token)
-		while (tokenDocFreqIter.hasNext()) {
-			Entry<String, Set<Integer>> currentPair = tokenDocFreqIter.next();
-			String currentToken = currentPair.getKey();
-			Set<Integer> currentSet = currentPair.getValue();
-			int frequencyCount = currentSet.size();
+	public void writeIndexToFile(String path) throws IOException {
 
-			if (frequencyCount > maxFreqThreshold || frequencyCount < minFreqThreshold) {
-				tokenSet.remove(currentToken);
-				dictionary.remove(currentToken);
-				tokenIdfTfMap.remove(currentToken);
-				tokenDocFreqIter.remove();
-			}
-		}
-	}
-
-	/**
-	 * TODO
-	 */
-	private void createSortedTokenList() {
-		for (String token : tokenSet) {
-			sortedTokenList.add(token);
-		}
-
+		// Sort token set and convert to list
+		List<String> sortedTokenList = new ArrayList<String>(tokenSet);
 		Collections.sort(sortedTokenList);
 
-		tokenSet = null;
+		FastVector attributes = new FastVector();
+		attributes.addElement(new Attribute("filename", (FastVector) null));
+		attributes.addElement(new Attribute("document-id"));
+		addAttributesTokens(sortedTokenList, attributes);
+		FastVector classAssignmentValues = addAttributeClassAssignment(classAssignmentSet, attributes);
+
+		Instances instances = new Instances("Index", attributes, 0);
+		addDocumentData(instances, classAssignmentValues, sortedTokenList.size());
+
+		ArffSaver saver = new ArffSaver();
+		saver.setFile(new File(path));
+		saver.setRetrieval(Saver.INCREMENTAL);
+		saver.setStructure(instances);
+
+		// Write each instance to disk incrementally
+		for (int instanceIndex = 0; instanceIndex < instances.numInstances(); instanceIndex++) {
+			saver.writeIncremental(instances.instance(instanceIndex));
+		}
 	}
 
-	public Map<String, ArrayList<Posting>> getDictionary() {
-		return dictionary;
+	/**
+	 * Add the document data to the instances
+	 * 
+	 * @param documentsList
+	 * @param instances
+	 * @param classAssignmentValues
+	 * @param tokenIdftfMap
+	 * @param tokenAttributesCount
+	 */
+	private void addDocumentData(Instances instances, FastVector classAssignmentValues, int tokenAttributesCount) {
+
+		for (Document document : documentList) {
+			double[] dataValues = new double[instances.numAttributes()];
+
+			dataValues[0] = instances.attribute(0).addStringValue(document.getName());
+			dataValues[1] = document.getId();
+			dataValues[2] = classAssignmentValues.indexOf(document.getClassAssignment());
+
+			for (int index = 0; index < tokenAttributesCount; ++index) {
+
+				int attributeIndex = index + 3;
+
+				// Get IDFTF map of the current token
+				Map<Integer, Float> docIdftfMap = tokenIdftfMap.get(instances.attribute(attributeIndex).name());
+
+				if (docIdftfMap != null && docIdftfMap.get(document.getId()) != null) {
+					dataValues[attributeIndex] = docIdftfMap.get(document.getId());
+				} else {
+					dataValues[attributeIndex] = 0;
+				}
+			}
+
+			instances.add(new Instance(1.0, dataValues));
+		}
 	}
 
-	public ArrayList<Document> getDocumentsList() {
-		return documentsList;
+	/**
+	 * Add the class assignments as attributes
+	 * 
+	 * @param classAssignmentSet
+	 * @param attributes
+	 * @return
+	 */
+	private static FastVector addAttributeClassAssignment(Set<String> classAssignmentSet, FastVector attributes) {
+
+		FastVector classAssignmentValues = new FastVector();
+		for (String classAssignment : classAssignmentSet) {
+			classAssignmentValues.addElement(classAssignment);
+		}
+
+		attributes.addElement(new Attribute("class-assignment", classAssignmentValues));
+		return classAssignmentValues;
 	}
 
-	public Set<String> getClassAssignmentSet() {
-		return classAssignmentSet;
-	}
-
-	public ArrayList<String> getSortedTokenList() {
-		return sortedTokenList;
-	}
-
-	public Map<String, Map<Integer, Float>> getTokenIdfTfMap() {
-		return tokenIdfTfMap;
+	/**
+	 * Adds the tokens as attributes
+	 * 
+	 * @param sortedTokenList
+	 * @param attributes
+	 * @return
+	 */
+	private static void addAttributesTokens(List<String> sortedTokenList, FastVector attributes) {
+		for (String token : sortedTokenList) {
+			attributes.addElement(new Attribute(token));
+		}
 	}
 }
