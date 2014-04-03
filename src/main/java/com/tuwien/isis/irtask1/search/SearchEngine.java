@@ -10,6 +10,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Scanner;
 
+/**
+ * SearchEngine which performs the search (currently with only VSM-Cosine similarity method)
+ * 
+ * @author Wagi
+ * 
+ */
 public class SearchEngine {
 	private List<DocumentVector> documentVectors;
 	private int numberOfSearchResults;
@@ -18,11 +24,16 @@ public class SearchEngine {
 		this.numberOfSearchResults = numberOfSearchResults;
 	}
 
-	public void searchSimilarDocuments(String inputFilePath,
-			String indexFilePath) {
+	/**
+	 * searches similar documents by query documents (defined by inputFilePath) with the Vector
+	 * Space Model (and Cosine distance function)
+	 * 
+	 * @param inputFilePath
+	 * @param indexFilePath
+	 */
+	public void searchSimilarDocuments(String inputFilePath, String indexFilePath) {
 
-		documentVectors = DocumentVectorBuilder
-				.buildDocumentVectors(indexFilePath);
+		documentVectors = DocumentVectorBuilder.buildDocumentVectors(indexFilePath);
 
 		processSimilarityRetrieval(inputFilePath);
 	}
@@ -42,8 +53,13 @@ public class SearchEngine {
 		this.numberOfSearchResults = numberOfSearchResults;
 	}
 
+	/**
+	 * processing the search
+	 * 
+	 * @param inputFilePath
+	 */
 	private void processSimilarityRetrieval(String inputFilePath) {
-		System.out.println("Reading topic file - " + inputFilePath);
+		System.out.println("Processing topic file - " + inputFilePath);
 		Path path = Paths.get(inputFilePath);
 		try {
 			Scanner scanner = new Scanner(path);
@@ -53,24 +69,25 @@ public class SearchEngine {
 			while (scanner.hasNextLine()) {
 				String line = scanner.nextLine();
 
+				System.out.println("query: " + line);
+
 				DocumentVector currQueryDocVec = findQueryInDocumentList(line);
+				if (currQueryDocVec == null) {
+					System.out.println("because null, skipping input query " + line);
 
-				List<DocumentVector> resultList = CosineSimilarityRetrieval
-						.buildSearchResultsList(currQueryDocVec,
-								documentVectors);
+					topicNr++;
+					continue;
+				}
 
-				Collections.sort(resultList,
-						new DocumentVectorCosineComparator());
+				System.out.println(currQueryDocVec);
 
-				// for debug
-				// for (int j = 0; j < resultList.size(); j++) {
-				// System.out.println("- "
-				// + resultList.get(j).getFullDocName() + " - cos: "
-				// + resultList.get(j).getCosine());
-				// }
+				List<DocumentVector> resultList = CosineSimilarityRetrieval.buildSearchResultsList(currQueryDocVec,
+						documentVectors);
 
-				String outputFilePath = "output/" + "topic_" + topicNr
-						+ "_results" + ".txt";
+				// sort result list
+				Collections.sort(resultList, new DocumentVectorCosineComparator());
+
+				String outputFilePath = "output/" + "topic_" + topicNr + "_results" + ".txt";
 
 				writeSearchResultsIntoFile(outputFilePath, resultList, topicNr);
 
@@ -82,8 +99,7 @@ public class SearchEngine {
 			scanner.close();
 
 		} catch (IOException e) {
-			System.err.println("error with InputFile Scanner: "
-					+ e.getMessage());
+			System.err.println("error with InputFile Scanner: " + e.getMessage());
 
 			// e.printStackTrace();
 		}
@@ -92,62 +108,55 @@ public class SearchEngine {
 	/**
 	 * parses the parameter String line to a DocumentVector
 	 * 
-	 * 
 	 * @param line
 	 * @return
 	 */
 	private DocumentVector findQueryInDocumentList(String line) {
-		DocumentVector currDocVec = null;
-
 		// search document in document list
-		for (int i = 0; i < documentVectors.size(); i++) {
-			// String name = documentVectors.get(i).
-			// System.out.println(documentVectors.get(i).getFullDocName());
-			if (line.equals(documentVectors.get(i).getFullDocName())) {
-				currDocVec = documentVectors.get(i);
+		for (DocumentVector currDocVec : documentVectors) {
+
+			// System.out.println("currDocVec fullname= " + currDocVec.getFullDocName());
+			if (line.equals(currDocVec.getFullDocName())) {
+				return currDocVec;
 			}
 		}
-
-		if (currDocVec == null) {
-			System.out.println("Document " + line + " not in collection");
-
-		}
-		return currDocVec;
+		// in case nothing found return null
+		System.out.println("doc " + line + " not in collection");
+		return null;
 	}
 
-	private void writeSearchResultsIntoFile(String outputFilePath,
-			List<DocumentVector> resultList, int topicNr) {
+	/**
+	 * writes the resultList into a file defined by outputFilePath
+	 * 
+	 * @param outputFilePath
+	 * @param resultList
+	 * @param topicNr
+	 */
+	private void writeSearchResultsIntoFile(String outputFilePath, List<DocumentVector> resultList, int topicNr) {
 		try {
 			File file = new File(outputFilePath);
 			file.getParentFile().mkdirs();
 			PrintWriter writer = new PrintWriter(file);
+			String runName = "bagOfWords";
 
 			if (this.numberOfSearchResults > resultList.size())
 				this.numberOfSearchResults = resultList.size();
 
 			for (int k = 0; k < this.numberOfSearchResults; k++) {
 				DocumentVector currVec = resultList.get(k);
-				// TODO
-				// topic1 Q0 misc.forsale/74721 1 34.32 group10_medium
-				String line = "topic" + topicNr + " Q0 "
-						+ currVec.getFullDocName()
-						+ " "
-						// + currVec.getDocumentData().m_docID
-						+ k + " "
-						+ String.format("%.2f", currVec.getCosine() * 100)
-						+ " group3" + "_";// +
-											// getCurrentPostingListSizeString();
+
+				// write output line
+				String line = "topic" + topicNr + " Q0 " + currVec.getFullDocName() + " " + k + " "
+						+ String.format("%.2f", currVec.getCosine() * 100) + " group3" + "-" + runName;// +
 
 				writer.write(line);
 				writer.write("\n");
 				System.out.println("Writing: " + line);
 			}
-
 			writer.close();
 
 		} catch (FileNotFoundException e) {
-			System.err.println("Couldn'T write into file: " + outputFilePath
-					+ " error: " + e.getMessage());
+			System.err.println("Couldn'T write into file: " + outputFilePath + " error: " + e.getMessage());
 			// e.printStackTrace();
 		}
 	}

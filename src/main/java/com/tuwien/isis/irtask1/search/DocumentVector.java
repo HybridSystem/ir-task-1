@@ -48,4 +48,13 @@ public class DocumentVector {
 		this.docIdftfMap = docIdftfMap;
 	}
 
+	/* (non-Javadoc)
+	 * @see java.lang.Object#toString()
+	 */
+	@Override
+	public String toString() {
+		return "DocumentVector [documentData=" + documentData
+				+ ", docIdftfMap=" + docIdftfMap + ", cosine=" + cosine + "]";
+	}
+
 }
