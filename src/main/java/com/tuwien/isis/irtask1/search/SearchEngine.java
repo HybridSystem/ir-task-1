@@ -10,6 +10,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Scanner;
 
+/**
+ * SearchEngine which performs the search
+ * (currently with only VSM-Cosine similarity method)
+ * @author Wagi
+ *
+ */
 public class SearchEngine {
 	private List<DocumentVector> documentVectors;
 	private int numberOfSearchResults;
@@ -43,7 +49,7 @@ public class SearchEngine {
 	}
 
 	private void processSimilarityRetrieval(String inputFilePath) {
-		System.out.println("Reading topic file - " + inputFilePath);
+		System.out.println("Processing topic file - " + inputFilePath);
 		Path path = Paths.get(inputFilePath);
 		try {
 			Scanner scanner = new Scanner(path);
@@ -52,22 +58,26 @@ public class SearchEngine {
 
 			while (scanner.hasNextLine()) {
 				String line = scanner.nextLine();
+				
+				System.out.println("query: " +line);
 
-				DocumentVector currQueryDocVec = findQueryInDocumentList(line);
-
+				DocumentVector currQueryDocVec = findQueryInDocumentList(line);	
+				if(currQueryDocVec==null){
+					System.out.println("skipping input query " + line);
+					
+					topicNr++;
+					continue;
+				}
+				
+				System.out.println(currQueryDocVec);
+				
 				List<DocumentVector> resultList = CosineSimilarityRetrieval
 						.buildSearchResultsList(currQueryDocVec,
 								documentVectors);
 
+				//sort result list
 				Collections.sort(resultList,
 						new DocumentVectorCosineComparator());
-
-				// for debug
-				// for (int j = 0; j < resultList.size(); j++) {
-				// System.out.println("- "
-				// + resultList.get(j).getFullDocName() + " - cos: "
-				// + resultList.get(j).getCosine());
-				// }
 
 				String outputFilePath = "output/" + "topic_" + topicNr
 						+ "_results" + ".txt";
@@ -100,14 +110,14 @@ public class SearchEngine {
 		// search document in document list	
 		for(DocumentVector currDocVec: documentVectors){
 			
+			//System.out.println("currDocVec fullname= " + currDocVec.getFullDocName()); 
 			if(line.equals(currDocVec.getFullDocName())){
 				return currDocVec;
 			}
-		}
-		
+		}		
 		//in case nothing found return null
-		return null;
-		
+		System.out.println("doc " + line + " not in collection");
+		return null;		
 	}
 
 	private void writeSearchResultsIntoFile(String outputFilePath,
@@ -137,7 +147,6 @@ public class SearchEngine {
 				writer.write("\n");
 				System.out.println("Writing: " + line);
 			}
-
 			writer.close();
 
 		} catch (FileNotFoundException e) {

@@ -408,6 +408,7 @@ public class Indexer {
 		Instances instances = new Instances("Index", attributes, 0);
 		addDocumentData(instances, classAssignmentValues, sortedTokenList.size());
 
+
 		ArffSaver saver = new ArffSaver();
 		saver.setFile(new File(path));
 		saver.setRetrieval(Saver.INCREMENTAL);
@@ -417,6 +418,8 @@ public class Indexer {
 		for (int instanceIndex = 0; instanceIndex < instances.numInstances(); instanceIndex++) {
 			saver.writeIncremental(instances.instance(instanceIndex));
 		}
+		saver.writeIncremental(null);
+
 	}
 
 	/**

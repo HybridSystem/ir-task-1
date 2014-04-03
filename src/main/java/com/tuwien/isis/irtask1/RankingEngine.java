@@ -100,7 +100,7 @@ public class RankingEngine {
 				indexer.createIndex(COLLECTION_PATH);
 				indexer.storeIndex(INDEX_PATH);
 			} else if (command.hasOption(SEARCH)) {
-				SearchEngine search = new SearchEngine(10);
+				SearchEngine search = new SearchEngine(100);
 				search.searchSimilarDocuments(getTopicList(command), INDEX_PATH);
 				System.out.println("Search completed.");
 			} else {
