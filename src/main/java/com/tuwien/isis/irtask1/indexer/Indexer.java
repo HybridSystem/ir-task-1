@@ -402,8 +402,8 @@ public class Indexer {
 		FastVector attributes = new FastVector();
 		attributes.addElement(new Attribute("filename", (FastVector) null));
 		attributes.addElement(new Attribute("document-id"));
-		addAttributesTokens(sortedTokenList, attributes);
 		FastVector classAssignmentValues = addAttributeClassAssignment(classAssignmentSet, attributes);
+		addAttributesTokens(sortedTokenList, attributes);
 
 		Instances instances = new Instances("Index", attributes, 0);
 		addDocumentData(instances, classAssignmentValues, sortedTokenList.size());
@@ -450,7 +450,7 @@ public class Indexer {
 					dataValues[attributeIndex] = 0;
 				}
 			}
-
+			
 			instances.add(new Instance(1.0, dataValues));
 		}
 	}

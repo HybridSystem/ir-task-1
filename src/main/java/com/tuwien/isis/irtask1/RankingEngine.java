@@ -119,12 +119,10 @@ public class RankingEngine {
 	 * @throws MissingOptionException
 	 */
 	private static String getTopicList(CommandLine command) throws MissingOptionException {
-
 		if (command.hasOption(TOPICS)) {
 			return command.getOptionValue(TOPICS);
 		} else {
 			throw new MissingOptionException("Topic list was not specified. Please use the -" + TOPICS + " option");
 		}
-
 	}
 }
