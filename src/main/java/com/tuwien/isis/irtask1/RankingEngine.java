@@ -11,8 +11,8 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.PosixParser;
 
 /**
- * Main class of the ranking engine, which indexes a document collection or performs searches on it using a
- * previously-generated index.
+ * Main class of the ranking engine, which indexes a document collection or performs searches on it
+ * using a previously-generated index.
  */
 public class RankingEngine {
 
@@ -61,6 +61,8 @@ public class RankingEngine {
 	 */
 	private static final String SEARCH = "s";
 
+	private static final String SEARCH_RESULT_NUMBER = "n";
+
 	/**
 	 * Handle user arguments
 	 * 
@@ -77,9 +79,11 @@ public class RankingEngine {
 		Option topics = new Option(TOPICS, true, "list of input topics");
 		Option min = new Option(MIN_FREQ, true, "minimum term frequency required to be added to index");
 		Option max = new Option(MAX_FREQ, true, "maximum term frequency allowed to be included in index");
+		Option nr = new Option(SEARCH_RESULT_NUMBER, true, "number of similar topic results");
 		options.addOption(topics);
 		options.addOption(min);
 		options.addOption(max);
+		options.addOption(nr);
 		CommandLineParser parser = new PosixParser();
 
 		try {
@@ -100,9 +104,13 @@ public class RankingEngine {
 				indexer.createIndex(COLLECTION_PATH);
 				indexer.storeIndex(INDEX_PATH);
 			} else if (command.hasOption(SEARCH)) {
-				SearchEngine search = new SearchEngine(100);
+				int n = command.hasOption(SEARCH_RESULT_NUMBER) ? Integer.parseInt(command
+						.getOptionValue(SEARCH_RESULT_NUMBER)) : 10;
+
+				SearchEngine search = new SearchEngine(n);
 				search.searchSimilarDocuments(getTopicList(command), INDEX_PATH);
-				System.out.println("Search completed.");
+
+				System.out.println("Search completed. check /output/ for results");
 			} else {
 				System.out.println("Invalid usage.");
 			}

@@ -29,10 +29,7 @@ public class DocumentVectorBuilder {
 			BufferedReader reader = new BufferedReader(new FileReader(
 					inputFilePath));
 			ArffReader arff = new ArffReader(reader, 1000);
-			// Instances data = arff.getData();
-
 			Instances data = arff.getStructure();
-			data.setClassIndex(data.numAttributes() - 1);
 			Instance inst;
 			while ((inst = arff.readInstance(data)) != null) {
 				data.add(inst);
@@ -40,8 +37,6 @@ public class DocumentVectorBuilder {
 
 			System.out
 					.println("ARRF read, continuing building DocumentVectors");
-
-			System.out.println("DEBUG, class index: " + data.classIndex());
 
 			List<DocumentVector> documentVectors = new ArrayList<DocumentVector>();
 
@@ -56,21 +51,16 @@ public class DocumentVectorBuilder {
 
 				docName = currInstance.toString(0);
 				docID = Integer.parseInt(currInstance.toString(1));
-				docClassAssignment = currInstance.toString(data.classIndex());
+				docClassAssignment = currInstance.toString(2);
 
 				Document currDoc = new Document(docName, docID,
 						docClassAssignment);
 
-				//hard coded positions of the attributes ( from 2 to numAttributes-1 )
-				for (int j = 2; j < currInstance.numAttributes() - 1; j++) {
+				for (int j = 3; j < currInstance.numAttributes(); j++) {
 
 					if (!currInstance.toString(j).equals("0")) {
 						currDocIdftfMap.put(currInstance.attribute(j).name(),
 								Float.parseFloat(currInstance.toString(j)));
-
-						// System.out.println("attr: "
-						// + currInstance.attribute(j).name() + " toString: "
-						// + currInstance.toString(j));
 					}
 
 				}
